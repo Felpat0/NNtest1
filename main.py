@@ -8,6 +8,57 @@ from tensorflow.keras import layers
 from matplotlib import pyplot as plt
 import seaborn as sns
 
+def plot_the_loss_curve(epochs, mse):
+  """Plot a curve of loss vs. epoch."""
+
+  plt.figure()
+  plt.xlabel("Epoch")
+  plt.ylabel("Mean Squared Error")
+
+  plt.plot(epochs, mse, label="Loss")
+  plt.legend()
+  plt.ylim([mse.min()*0.95, mse.max() * 1.03])
+  plt.show()  
+
+print("Defined the plot_the_loss_curve function.")
+
+def create_model(my_learning_rate, feature_layer):
+  """Create and compile a simple linear regression model."""
+  # Most simple tf.keras models are sequential.
+  model = tf.keras.models.Sequential()
+
+  # Add the layer containing the feature columns to the model.
+  model.add(feature_layer)
+
+  # Add one linear layer to the model to yield a simple linear regressor.
+  model.add(tf.keras.layers.Dense(units=1, input_shape=(1,)))
+
+  # Construct the layers into a model that TensorFlow can execute.
+  model.compile(optimizer=tf.keras.optimizers.RMSprop(lr=my_learning_rate),
+                loss="mean_squared_error",
+                metrics=[tf.keras.metrics.MeanSquaredError()])
+
+  return model           
+
+
+def train_model(model, dataset, epochs, batch_size, label_name):
+  """Feed a dataset into the model in order to train it."""
+
+  # Split the dataset into features and label.
+  features = {name:np.array(value) for name, value in dataset.items()}
+  label = np.array(features.pop(label_name))
+  history = model.fit(x=features, y=label, batch_size=batch_size,
+                      epochs=epochs, shuffle=True)
+
+  # Get details that will be useful for plotting the loss curve.
+  epochs = history.epoch
+  hist = pd.DataFrame(history.history)
+  rmse = hist["mean_squared_error"]
+
+  return epochs, rmse   
+
+print("Defined the create_model and train_model functions.")
+
 # The following lines adjust the granularity of reporting. 
 pd.options.display.max_rows = 10
 pd.options.display.float_format = "{:.1f}".format
@@ -70,3 +121,21 @@ feature_columns.append(population)
 # Convert the list of feature columns into a layer that will later be fed into
 # the model. 
 my_feature_layer = tf.keras.layers.DenseFeatures(feature_columns)
+
+# The following variables are the hyperparameters.
+learning_rate = 0.01
+epochs = 15
+batch_size = 1000
+label_name = "median_house_value"
+
+# Establish the model's topography.
+my_model = create_model(learning_rate, my_feature_layer)
+
+# Train the model on the normalized training set.
+epochs, mse = train_model(my_model, train_df_norm, epochs, batch_size, label_name)
+plot_the_loss_curve(epochs, mse)
+
+test_features = {name:np.array(value) for name, value in test_df_norm.items()}
+test_label = np.array(test_features.pop(label_name)) # isolate the label
+print("\n Evaluate the linear regression model against the test set:")
+my_model.evaluate(x = test_features, y = test_label, batch_size=batch_size)
